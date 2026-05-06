@@ -1,0 +1,14 @@
+.app {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.card {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #111827;
+  color: #e5e7eb;
+  border-radius: 8px;
+  overflow: auto;
+}
