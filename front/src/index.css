@@ -1,15 +1,14 @@
-*, *::before, *::after {
+* {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: 'Outfit', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: system-ui, sans-serif;
+  background: #0f172a;
+  color: #f8fafc;
 }
 
-#root {
-  width: 100%;
-  min-height: 100vh;
+h1 {
+  font-weight: 600;
 }

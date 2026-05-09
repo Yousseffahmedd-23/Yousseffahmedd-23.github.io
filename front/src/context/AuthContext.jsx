@@ -1,55 +1,58 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import API from '../api/axiosConfig';
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { apiFetch, clearTokens, setTokens } from "../api/client.js";
 
 const AuthContext = createContext(null);
 
-export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  // Rehydrate user from localStorage on first load
-  useEffect(() => {
-    const stored = localStorage.getItem('sabboora_user');
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem('sabboora_user');
-        localStorage.removeItem('sabboora_token');
-      }
-    }
-    setLoading(false);
-  }, []);
-
-  const _persist = (data) => {
-    localStorage.setItem('sabboora_token', data.token);
-    localStorage.setItem('sabboora_user', JSON.stringify(data));
-    setUser(data);
-  };
-
-  const login = async (email, password) => {
-    const { data } = await API.post('/auth/login', { email, password });
-    _persist(data);
-    return data;
-  };
-
-  const register = async (name, email, password) => {
-    const { data } = await API.post('/auth/register', { name, email, password });
-    _persist(data);
-    return data;
-  };
-
-  const logout = () => {
-    localStorage.removeItem('sabboora_token');
-    localStorage.removeItem('sabboora_user');
-    setUser(null);
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+function decodeJwtPayload(token) {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const base64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = "=".repeat((4 - (base64.length % 4)) % 4);
+    const json = atob(base64 + pad);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
 }
 
-export const useAuth = () => useContext(AuthContext);
+export function AuthProvider({ children }) {
+  const [token, setTokenState] = useState(() => localStorage.getItem("mern.accessToken"));
+  const payload = token ? decodeJwtPayload(token) : null;
+  const role = payload?.role ?? null;
+
+  const login = useCallback(async (email, password) => {
+    clearTokens();
+    const data = await apiFetch("/api/auth/login", {
+      method: "POST",
+      body: { email, password },
+    });
+    setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+    setTokenState(data.accessToken);
+    return data;
+  }, []);
+
+  const logout = useCallback(() => {
+    clearTokens();
+    setTokenState(null);
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      token,
+      role,
+      login,
+      logout,
+      isAuthenticated: Boolean(token),
+    }),
+    [token, role, login, logout],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be inside AuthProvider");
+  return ctx;
+}
