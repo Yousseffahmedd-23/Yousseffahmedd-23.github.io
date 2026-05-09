@@ -19,6 +19,8 @@ import { Material } from "../models/Material.js";
 import { SystemSetting } from "../models/SystemSetting.js";
 import { ParentProfile } from "../models/ParentProfile.js";
 import { StudentProfile } from "../models/StudentProfile.js";
+import { Assignment } from "../models/Assignment.js";
+import { emitSync } from "../socket.js";
 
 const router = Router();
 
@@ -81,7 +83,7 @@ router.post(
       });
 
       await createProfileForNewUser(req.body.role, user._id, req.body);
-
+      emitSync("user:created", { id: user._id, email: user.email, role: user.role });
       res.status(201).json({ id: user._id, email: user.email, role: user.role });
     } catch (e) {
       next(e);
@@ -102,6 +104,7 @@ router.patch(
       if (req.body.email) user.email = req.body.email.toLowerCase();
       if (typeof req.body.isActive === "boolean") user.isActive = req.body.isActive;
       await user.save();
+      emitSync("user:updated", { id: user._id, email: user.email, role: user.role, isActive: user.isActive });
       res.json({ id: user._id, email: user.email, role: user.role, isActive: user.isActive });
     } catch (e) {
       next(e);
@@ -122,6 +125,7 @@ router.delete("/users/:id", param("id").isMongoId(), validate, async (req, res, 
     await ParentChildLink.deleteMany({ studentUserId: user._id });
     user.isActive = false;
     await user.save();
+    emitSync("user:deleted", { id: user._id, role: user.role });
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -149,6 +153,7 @@ router.post(
   async (req, res, next) => {
     try {
       const c = await ClassModel.create(req.body);
+      emitSync("class:created", { id: c._id, name: c.name });
       res.status(201).json(c);
     } catch (e) {
       next(e);
@@ -160,6 +165,7 @@ router.patch("/classes/:id", param("id").isMongoId(), body("name").optional().is
   try {
     const c = await ClassModel.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
     if (!c) throw new AppError(404, "Not found", "NOT_FOUND");
+    emitSync("class:updated", { id: c._id, name: c.name });
     res.json(c);
   } catch (e) {
     next(e);
@@ -173,6 +179,7 @@ router.delete("/classes/:id", param("id").isMongoId(), validate, async (req, res
     await Enrollment.deleteMany({ classId: req.params.id });
     await GradebookEntry.deleteMany({ classId: req.params.id });
     await ClassModel.findByIdAndDelete(req.params.id);
+    emitSync("class:deleted", { id: req.params.id });
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -264,6 +271,7 @@ router.post(
         { $set: { status: "active" } },
         { upsert: true, new: true },
       );
+      emitSync("enrollment:created", { studentUserId: e.studentUserId, classId: e.classId });
       res.status(201).json(e);
     } catch (e) {
       next(e);
@@ -282,6 +290,7 @@ router.delete(
         { studentUserId: req.body.studentUserId, classId: req.body.classId },
         { $set: { status: "dropped" } },
       );
+      emitSync("enrollment:dropped", { studentUserId: req.body.studentUserId, classId: req.body.classId });
       res.json({ ok: true });
     } catch (e) {
       next(e);
@@ -485,12 +494,30 @@ router.patch(
         { $set: { ...rest, updatedBy: req.user._id } },
         { upsert: true, new: true },
       );
+      emitSync("grade:updated", { studentUserId, classId, academicTerm });
       res.json(row);
     } catch (e) {
       next(e);
     }
   },
 );
+
+/** Assignments (read-only overview for admin) */
+router.get("/assignments", async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 100);
+    const page  = Math.max(Number(req.query.page)  || 1, 1);
+    const skip  = (page - 1) * limit;
+    const filter = {};
+    if (req.query.classId) filter.classId = req.query.classId;
+    const [items, total] = await Promise.all([
+      Assignment.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit)
+        .populate("classId", "name subject").populate("teacherUserId", "email").lean(),
+      Assignment.countDocuments(filter),
+    ]);
+    res.json({ items, total, page, limit });
+  } catch (e) { next(e); }
+});
 
 /** System settings */
 router.get("/settings", async (_req, res, next) => {

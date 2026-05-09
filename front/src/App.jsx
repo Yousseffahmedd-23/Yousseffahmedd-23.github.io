@@ -3,10 +3,12 @@ import "./App.css";
 import * as api from "./api/schoolApi.js";
 import { useAuth } from "./context/AuthContext.jsx";
 import Login from "./pages/Login.jsx";
+import { useSocket } from "./hooks/useSocket.js";
 
 /** Minimal API tester — no layout/design; wires role routes to JSON output. */
 export default function App() {
   const { role, logout, isAuthenticated } = useAuth();
+  const { connected } = useSocket(); // realtime sync
 
   const [health, setHealth] = useState(null);
   const [me, setMe] = useState(null);
