@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import './Login.css';
 
 const CHALK_DECO = [
@@ -17,13 +19,26 @@ const CHALK_DECO = [
 ];
 
 export default function Login() {
+  const { login }         = useAuth();
+  const navigate          = useNavigate();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // TODO: POST to /api/auth/login
+    setError('');
+    setLoading(true);
+    try {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -87,6 +102,13 @@ export default function Login() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="login-form" data-purpose="auth-form">
+          {/* Error banner */}
+          {error && (
+            <div className="form-error" role="alert">
+              {error}
+            </div>
+          )}
+
           {/* Email */}
           <div className="field-group">
             <label className="field-label" htmlFor="email">Email or Username</label>
@@ -134,7 +156,9 @@ export default function Login() {
           </div>
 
           {/* Submit */}
-          <button type="submit" className="submit-btn">Log In</button>
+          <button type="submit" className="submit-btn" disabled={loading}>
+            {loading ? 'Signing in…' : 'Log In'}
+          </button>
         </form>
 
         {/* Social divider */}
@@ -168,7 +192,7 @@ export default function Login() {
         <div className="card-footer" data-purpose="card-footer">
           <p>
             New to Sabboora?{' '}
-            <a className="signup-link" href="#">Create an account</a>
+            <Link className="signup-link" to="/register">Create an account</Link>
           </p>
         </div>
       </div>

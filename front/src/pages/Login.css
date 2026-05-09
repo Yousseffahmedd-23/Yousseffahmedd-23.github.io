@@ -213,6 +213,17 @@
   gap: 1.25rem;
 }
 
+/* Error banner */
+.form-error {
+  padding: 0.75rem 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #dc2626;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
 .field-group {
   display: flex;
   flex-direction: column;
@@ -295,6 +306,11 @@
   box-shadow: 0 6px 18px rgba(45, 90, 39, 0.45);
 }
 .submit-btn:active { transform: scale(0.98); }
+.submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
 
 /* ── Divider ── */
 .social-divider {
